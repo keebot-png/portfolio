@@ -21,6 +21,13 @@ import { hideLoader } from './ui/loader.js';
 import { startFallback, scrollToSection, scrollToTop } from './ui/fallback.js';
 
 document.title = `${portfolio.about.name} — ${portfolio.about.title}`;
+const description = document.querySelector('meta[name="description"]');
+if (description) {
+  description.setAttribute(
+    'content',
+    `Meet ${portfolio.about.name}, ${portfolio.about.title}, in an interactive 3D studio.`
+  );
+}
 
 const uiRoot = document.getElementById('ui');
 uiRoot.inert = true;

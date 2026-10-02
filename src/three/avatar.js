@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { createCharacter } from './character.js';
 
+// Place a GLB at public/models/avatar.glb, then set this to '/models/avatar.glb'.
+// Leave it null to keep the built-in character. A missing file falls back too.
+export const AVATAR_URL = null;
+
 const DEFAULT_OPTIONS = {
-  // Set to a GLB path (e.g. '/models/avatar.glb') to load a model instead of
-  // the built-in character. The built-in character is also the fallback.
-  url: null,
+  url: AVATAR_URL,
   height: 1.75,
   groundY: 0,
   // Where the avatar stands (x, z); y comes from groundY.
