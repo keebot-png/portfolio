@@ -1,13 +1,20 @@
 import * as THREE from 'three';
 
-export function createCamera() {
+export const CAMERA_TARGET = new THREE.Vector3(0, 1, 0);
+
+export function createCamera({ fov = 40, near = 0.1, far = 100 } = {}) {
   const camera = new THREE.PerspectiveCamera(
-    60,
+    fov,
     window.innerWidth / window.innerHeight,
-    0.1,
-    100
+    near,
+    far
   );
-  camera.position.set(0, 1.5, 5);
-  camera.lookAt(0, 0, 0);
+  camera.position.set(0, 1.8, 7);
+  camera.lookAt(CAMERA_TARGET);
   return camera;
+}
+
+export function resizeCamera(camera, width, height) {
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
 }
