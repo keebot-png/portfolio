@@ -7,6 +7,19 @@ export function clay(color, extra = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...extra });
 }
 
+// Shared materials for non-interactive decor. Do not use on props that tint
+// their emissive on hover — that would light up every mesh on the same color.
+const sharedClay = new Map();
+
+export function clayShared(color) {
+  let material = sharedClay.get(color);
+  if (!material) {
+    material = clay(color);
+    sharedClay.set(color, material);
+  }
+  return material;
+}
+
 export function mesh(geometry, material, position = [0, 0, 0], rotation = [0, 0, 0]) {
   const object = new THREE.Mesh(geometry, material);
   object.position.set(...position);

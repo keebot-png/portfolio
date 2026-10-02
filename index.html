@@ -5,10 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f5eee4" />
     <title>Portfolio</title>
+    <style>
+      /* Critical: visible before the JS/CSS bundle arrives. */
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: #f5eee4;
+        color: #2b2420;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      #loader {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: grid;
+        place-items: center;
+        background: #f5eee4;
+      }
+      #loader[hidden] {
+        display: none !important;
+      }
+      .loader-mark {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      .loader-dot {
+        width: 12px;
+        height: 12px;
+        background: #f28c28;
+        border-radius: 50%;
+        animation: loader-pulse 1s ease-in-out infinite;
+      }
+      .loader-text {
+        margin: 0;
+        font-size: 0.85rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #6b5c50;
+      }
+      @keyframes loader-pulse {
+        0%,
+        100% {
+          transform: scale(0.85);
+          opacity: 0.55;
+        }
+        50% {
+          transform: scale(1.15);
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .loader-dot {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <a class="skip-link" href="#site-nav">Skip to navigation</a>
+    <div id="loader" role="status" aria-live="polite" aria-busy="true">
+      <div class="loader-mark">
+        <span class="loader-dot" aria-hidden="true"></span>
+        <p class="loader-text">Loading the studio</p>
+      </div>
+    </div>
     <div id="app" aria-hidden="true"></div>
     <div id="ui"></div>
+    <noscript>
+      <main class="noscript">
+        <h1>Alex Morgan</h1>
+        <p>Full-Stack Software Developer</p>
+        <p>
+          This portfolio needs JavaScript to show the studio and the project list.
+          Please enable JavaScript to continue.
+        </p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

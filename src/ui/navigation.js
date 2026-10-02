@@ -30,7 +30,7 @@ export function createNavigation({ root, about, sections, onSelect, onHome }) {
       el('span', { class: 'brand-name', text: about.name }),
       el('span', { class: 'brand-title', text: about.title }),
     ]),
-    el('nav', { class: 'site-nav', 'aria-label': 'Portfolio sections' }, [list]),
+    el('nav', { id: 'site-nav', class: 'site-nav', 'aria-label': 'Portfolio sections' }, [list]),
   ]);
 
   root.append(header);
@@ -41,7 +41,8 @@ export function createNavigation({ root, about, sections, onSelect, onHome }) {
         button.setAttribute('aria-expanded', String(id === activeId));
       }
       // On phones the list scrolls horizontally; keep the active item in view.
-      buttons.get(activeId)?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      buttons.get(activeId)?.scrollIntoView({ block: 'nearest', inline: 'center', behavior });
     },
     focus(id) {
       buttons.get(id)?.focus();

@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createCharacter } from './character.js';
 
 const DEFAULT_OPTIONS = {
@@ -23,10 +22,10 @@ export async function loadAvatar(scene, options = {}) {
     avatar = createCharacter(config);
   } else {
     try {
+      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
       const gltf = await new GLTFLoader().loadAsync(config.url);
       avatar = createModelAvatar(gltf, config);
-    } catch (error) {
-      console.error(`Avatar: failed to load "${config.url}", using built-in character.`, error);
+    } catch {
       avatar = createCharacter(config);
     }
   }

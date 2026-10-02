@@ -7,19 +7,31 @@ import { getViewport } from './viewport.js';
 export function startAnimationLoop(renderer, scene, camera, onFrame) {
   const timer = new THREE.Timer();
   timer.connect(document);
-  let frameId;
+  let frameId = 0;
 
   function tick(timestamp) {
+    if (document.hidden) {
+      frameId = 0;
+      return;
+    }
     frameId = requestAnimationFrame(tick);
     timer.update(timestamp);
-    onFrame?.(timer.getDelta(), timer.getElapsed());
+    // Cap so a long tab-hide does not dump a huge delta into the tweens.
+    onFrame?.(Math.min(timer.getDelta(), 0.05), timer.getElapsed());
     renderer.render(scene, camera);
   }
 
+  function onVisibility() {
+    if (!document.hidden && !frameId) frameId = requestAnimationFrame(tick);
+  }
+
+  document.addEventListener('visibilitychange', onVisibility);
   frameId = requestAnimationFrame(tick);
 
   return function stop() {
     cancelAnimationFrame(frameId);
+    frameId = 0;
+    document.removeEventListener('visibilitychange', onVisibility);
     timer.dispose();
   };
 }

@@ -3,7 +3,10 @@ import { el } from './dom.js';
 // Shared building blocks
 
 function externalLink(href, text, className) {
-  return el('a', { href, class: className, target: '_blank', rel: 'noopener noreferrer', text });
+  return el('a', { href, class: className, target: '_blank', rel: 'noopener noreferrer' }, [
+    text,
+    el('span', { class: 'visually-hidden', text: ' (opens in a new tab)' }),
+  ]);
 }
 
 function stripProtocol(url) {

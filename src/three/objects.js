@@ -218,23 +218,34 @@ export function updatePortfolioObjects(objects, delta, elapsed = 0, { simple = f
   for (const object of objects) {
     const data = object.userData;
     const target = data.hovered ? 1 : data.selected ? 0.55 : 0;
+    const previous = data.highlight;
     data.highlight = THREE.MathUtils.damp(data.highlight, target, 10, delta);
     const h = data.highlight;
+    const idle = h < 0.001 && target === 0;
 
-    // Desk items stay put until attention lands on them, then they lift and
-    // float gently with a slight rotation, so the motion never competes with the content.
-    const t = elapsed + data.phase;
-    const motion = simple ? 0 : 1;
-    object.scale.setScalar(data.baseScale * (1 + h * 0.06));
-    object.position.y = data.basePosition.y + h * (0.03 + Math.sin(t * 2.2) * 0.012 * motion);
-    object.rotation.y = data.baseRotationY + h * Math.sin(t * 1.6) * 0.035 * motion;
+    // Nothing to do: not hovered, not selected, highlight already settled.
+    // On small screens the idle pulse/typing is off, so the whole object can sleep.
+    if (idle && previous < 0.001 && simple) continue;
 
-    // Lighting: screens softly pulse all the time; hover adds a warm glow that
-    // is subtle enough for dark screens to stay dark. Pulse is skipped on small screens.
+    if (!idle || previous >= 0.001) {
+      const t = elapsed + data.phase;
+      const motion = simple ? 0 : 1;
+      object.scale.setScalar(data.baseScale * (1 + h * 0.06));
+      object.position.y = data.basePosition.y + h * (0.03 + Math.sin(t * 2.2) * 0.012 * motion);
+      object.rotation.y = data.baseRotationY + h * Math.sin(t * 1.6) * 0.035 * motion;
+    }
+
     for (const { material, baseEmissive, baseIntensity, pulse } of data.materials) {
-      const idle = !simple && pulse ? baseIntensity + Math.sin(elapsed * pulse.speed + pulse.phase) * pulse.amplitude : baseIntensity;
-      material.emissive.copy(baseEmissive).lerp(HIGHLIGHT_COLOR, h * 0.2);
-      material.emissiveIntensity = THREE.MathUtils.lerp(idle, Math.max(idle, 0.18), h);
+      const glow = !simple && pulse
+        ? baseIntensity + Math.sin(elapsed * pulse.speed + pulse.phase) * pulse.amplitude
+        : baseIntensity;
+      if (h > 0) {
+        material.emissive.copy(baseEmissive).lerp(HIGHLIGHT_COLOR, h * 0.2);
+        material.emissiveIntensity = THREE.MathUtils.lerp(glow, Math.max(glow, 0.18), h);
+      } else if (pulse && !simple) {
+        material.emissive.copy(baseEmissive);
+        material.emissiveIntensity = glow;
+      }
     }
 
     if (!simple) {

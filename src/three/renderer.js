@@ -1,12 +1,30 @@
 import * as THREE from 'three';
 
+export function isWebGLAvailable() {
+  try {
+    const canvas = document.createElement('canvas');
+    return Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+  } catch {
+    return false;
+  }
+}
+
 // Set `alpha: true` only when the canvas must show the page behind it;
 // the scene paints its own background, so an opaque canvas is cheaper.
-export function createRenderer(container, { alpha = false, pixelRatio = Math.min(window.devicePixelRatio, 2) } = {}) {
+export function createRenderer(container, {
+  alpha = false,
+  antialias = true,
+  pixelRatio = Math.min(window.devicePixelRatio || 1, 2),
+} = {}) {
+  if (!isWebGLAvailable()) {
+    throw new Error('WebGL is not available');
+  }
+
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias,
     alpha,
     powerPreference: 'high-performance',
+    stencil: false,
   });
 
   renderer.setPixelRatio(pixelRatio);
