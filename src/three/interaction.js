@@ -67,8 +67,11 @@ export function createInteraction({ camera, domElement, objects, onSelect }) {
     update() {
       if (pointerActive) setHovered(pick());
     },
-    selectSection(section) {
-      select(objects.find((object) => object.userData.section === section));
+    // Marks a section as selected without calling onSelect (for UI-driven selection).
+    setSelected(section) {
+      if (selected) selected.userData.selected = false;
+      selected = objects.find((object) => object.userData.section === section) ?? null;
+      if (selected) selected.userData.selected = true;
     },
     clearSelection,
     get selected() {
