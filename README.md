@@ -24,6 +24,17 @@ npm run build
 
 Preview the build with `npm run preview`.
 
+## GitHub Pages
+
+The site deploys from `main` via GitHub Actions. After you push, turn on Pages once:
+
+1. Repo **Settings → Pages**
+2. **Source:** GitHub Actions
+
+The live URL is `https://keebot-png.github.io/portfolio/`.
+
+CI sets `GITHUB_PAGES=true` so Vite builds with `base: '/portfolio/'`. Local `npm run dev` and `npm run build` still use `/`.
+
 ## Avatar replacement
 
 The studio ships with a built-in character (t-shirt, shorts, cap, idle breathing and an occasional wave).
@@ -39,7 +50,7 @@ public/models/avatar.glb
 2. In `src/three/avatar.js`, set:
 
 ```js
-export const AVATAR_URL = '/models/avatar.glb';
+export const AVATAR_URL = `${import.meta.env.BASE_URL}models/avatar.glb`;
 ```
 
 The loader looks for an animation clip whose name matches `/idle/i`. If the file is missing, fails to load, or has no idle clip, the built-in character is used instead. Optional `materialColors` in the same file can recolour named materials on a loaded model.
