@@ -15,7 +15,6 @@ import { startAnimationLoop } from './three/animation.js';
 
 import { createNavigation } from './ui/navigation.js';
 import { createPanels } from './ui/panels.js';
-import { createModal } from './ui/modal.js';
 import { createSectionRenderers } from './ui/sections.js';
 
 document.title = `${portfolio.about.name} — ${portfolio.about.title}`;
@@ -51,8 +50,6 @@ loadAvatar(scene).then((loaded) => {
 // HTML interface
 const uiRoot = document.getElementById('ui');
 
-const modal = createModal(uiRoot);
-
 const navigation = createNavigation({
   root: uiRoot,
   about: portfolio.about,
@@ -64,7 +61,7 @@ const navigation = createNavigation({
 const panels = createPanels({
   root: uiRoot,
   sections: SECTIONS,
-  renderers: createSectionRenderers(portfolio, { modal }),
+  renderers: createSectionRenderers(portfolio),
   onClose: () => closeSection(),
 });
 

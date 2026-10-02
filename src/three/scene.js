@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 
-export const BACKGROUND_COLOR = 0x0b0c10;
+// Warm cream backdrop. The floor is a shadow-only plane, so the ground and
+// background read as one seamless surface with soft drop shadows on it.
+export const BACKGROUND_COLOR = 0xf5eee4;
 
 export function createScene() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(BACKGROUND_COLOR);
-  scene.fog = new THREE.FogExp2(BACKGROUND_COLOR, 0.055);
   return scene;
 }

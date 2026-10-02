@@ -1,8 +1,13 @@
 import * as THREE from 'three';
 
-export const CAMERA_TARGET = new THREE.Vector3(0, 1.05, 0);
+// The character stands left of centre with the desk behind him on the right,
+// so the overview looks slightly down at the middle of that arrangement.
+export const CAMERA_TARGET = new THREE.Vector3(0.45, 1.05, -0.5);
 
-const HOME_POSITION = new THREE.Vector3(0, 1.45, 5);
+const HOME_POSITION = new THREE.Vector3(0.6, 2.05, 5.1);
+
+// Midpoint between the avatar (x ≈ -0.75) and the desk (x ≈ 1.05).
+const FOCUS_CENTER_X = 0.15;
 
 export function createCamera({ fov = 40, near = 0.1, far = 100 } = {}) {
   const camera = new THREE.PerspectiveCamera(
@@ -40,10 +45,12 @@ export function createCameraRig(camera, { damping = 4 } = {}) {
   return {
     focus(point) {
       // Lean toward the object while keeping the whole avatar in frame.
-      desired.target.lerpVectors(CAMERA_TARGET, point, 0.3);
-      desired.target.y = THREE.MathUtils.lerp(CAMERA_TARGET.y, point.y, 0.15);
-      desired.position.copy(homeDirection).multiplyScalar(0.95);
-      desired.position.x += point.x * 0.3;
+      // With a panel open only part of the screen is free, so pull back a little
+      // and tilt toward the prop while keeping the avatar and desk both in frame.
+      desired.target.lerpVectors(CAMERA_TARGET, point, 0.12);
+      desired.target.x = THREE.MathUtils.lerp(FOCUS_CENTER_X, point.x, 0.1);
+      desired.target.y = THREE.MathUtils.lerp(CAMERA_TARGET.y, point.y, 0.25);
+      desired.position.copy(homeDirection).multiplyScalar(1.18);
       desired.position.add(desired.target);
     },
 

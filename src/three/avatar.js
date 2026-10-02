@@ -1,30 +1,38 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createCharacter } from './character.js';
 
 const DEFAULT_OPTIONS = {
-  url: '/models/avatar.glb',
+  // Set to a GLB path (e.g. '/models/avatar.glb') to load a model instead of
+  // the built-in character. The built-in character is also the fallback.
+  url: null,
   height: 1.75,
-  groundY: 0.08,
+  groundY: 0,
+  // Where the avatar stands (x, z); y comes from groundY.
+  position: { x: -0.75, z: 0.15 },
   idleClip: /idle/i,
-  // Keyed by material name; only matching materials are recoloured.
-  materialColors: {
-    'asdf1:Beta_HighLimbsGeoSG2': { color: 0x9aa3b2, roughness: 0.55, metalness: 0.05 },
-    Beta_Joints_MAT: { color: 0x3d5a8c, roughness: 0.4, metalness: 0.3 },
-  },
+  // Optional recolouring keyed by material name, e.g. { Wolf3D_Outfit_Top: { color: 0x2b313c } }.
+  materialColors: {},
 };
 
 export async function loadAvatar(scene, options = {}) {
   const config = { ...DEFAULT_OPTIONS, ...options };
 
   let avatar;
-  try {
-    const gltf = await new GLTFLoader().loadAsync(config.url);
-    avatar = createModelAvatar(gltf, config);
-  } catch (error) {
-    console.error(`Avatar: failed to load "${config.url}", using fallback.`, error);
-    avatar = createFallbackAvatar(config);
+  if (!config.url) {
+    avatar = createCharacter(config);
+  } else {
+    try {
+      const gltf = await new GLTFLoader().loadAsync(config.url);
+      avatar = createModelAvatar(gltf, config);
+    } catch (error) {
+      console.error(`Avatar: failed to load "${config.url}", using built-in character.`, error);
+      avatar = createCharacter(config);
+    }
   }
 
+  avatar.object.position.x += config.position.x;
+  avatar.object.position.z += config.position.z;
   scene.add(avatar.object);
   return avatar;
 }
@@ -42,23 +50,76 @@ function createModelAvatar(gltf, config) {
 
   fitToHeight(model, config.height, config.groundY);
 
+  const blink = createBlink(model);
   const clips = gltf.animations;
-  if (clips.length === 0) {
-    return { object: model, update: createProceduralIdle(model) };
+  const idle = clips.find((clip) => config.idleClip.test(clip.name));
+
+  // Unanimated models export in a T/A-pose; relax the arms to the sides.
+  if (!idle) applyRestPose(model);
+
+  // Without a real idle clip, fall back to procedural movement rather than
+  // playing whatever clip happens to come first (which may be a walk or dance).
+  if (!idle) {
+    const proceduralIdle = createProceduralIdle(model);
+    return {
+      object: model,
+      update: (delta, elapsed) => {
+        proceduralIdle(delta, elapsed);
+        blink(elapsed);
+      },
+    };
   }
 
   const mixer = new THREE.AnimationMixer(model);
   const actions = Object.fromEntries(
     clips.map((clip) => [clip.name, mixer.clipAction(clip)])
   );
-  const idle = clips.find((clip) => config.idleClip.test(clip.name)) ?? clips[0];
   actions[idle.name].play();
 
   return {
     object: model,
     mixer,
     actions,
-    update: (delta) => mixer.update(delta),
+    update: (delta, elapsed) => {
+      mixer.update(delta);
+      blink(elapsed);
+    },
+  };
+}
+
+// Extra rotation (radians, about each bone's local Z) applied on top of the
+// exported bind pose. Mixamo-style rigs mirror left/right, hence the signs.
+const REST_POSE = [
+  { bone: /^(mixamorig:?)?LeftArm$/, z: -1.05 },
+  { bone: /^(mixamorig:?)?RightArm$/, z: 1.05 },
+];
+
+function applyRestPose(object) {
+  object.traverse((child) => {
+    if (!child.isBone) return;
+    const pose = REST_POSE.find(({ bone }) => bone.test(child.name));
+    if (pose) child.rotateZ(pose.z);
+  });
+}
+
+// Periodic eye blink driven by ARKit-style morph targets, if the model has them.
+function createBlink(object) {
+  const targets = [];
+  object.traverse((child) => {
+    const dict = child.morphTargetDictionary;
+    if (!dict) return;
+    for (const name of ['eyeBlinkLeft', 'eyeBlinkRight', 'eyesClosed']) {
+      if (name in dict) targets.push({ influences: child.morphTargetInfluences, index: dict[name] });
+    }
+  });
+  if (targets.length === 0) return () => {};
+
+  const PERIOD = 4.2;
+  const DURATION = 0.16;
+  return (elapsed) => {
+    const t = elapsed % PERIOD;
+    const amount = t < DURATION ? Math.sin((t / DURATION) * Math.PI) : 0;
+    for (const { influences, index } of targets) influences[index] = amount;
   };
 }
 
@@ -115,35 +176,4 @@ function createProceduralIdle(object) {
       object.rotation.y = base.rotationY + sway * 0.03;
     }
   };
-}
-
-function createFallbackAvatar(config) {
-  const material = new THREE.MeshStandardMaterial({
-    color: 0x9aa3b2,
-    roughness: 0.55,
-    metalness: 0.05,
-  });
-
-  const headRadius = config.height * 0.075;
-  const bodyRadius = config.height * 0.14;
-  const bodyLength = config.height * 0.85 - headRadius * 2 - bodyRadius * 2;
-
-  const body = new THREE.Mesh(
-    new THREE.CapsuleGeometry(bodyRadius, bodyLength, 8, 24),
-    material
-  );
-  body.position.y = bodyRadius + bodyLength / 2;
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(headRadius, 32, 16), material);
-  head.position.y = config.height - headRadius;
-
-  const figure = new THREE.Group();
-  figure.name = 'avatar-fallback';
-  figure.add(body, head);
-  figure.position.y = config.groundY;
-  figure.traverse((child) => {
-    if (child.isMesh) child.castShadow = true;
-  });
-
-  return { object: figure, update: createProceduralIdle(figure) };
 }

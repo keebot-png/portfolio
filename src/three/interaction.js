@@ -3,7 +3,12 @@ import * as THREE from 'three';
 export function createInteraction({ camera, domElement, objects, onSelect }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  const targets = objects.map((object) => object.userData.parts.core);
+  // Walk up from the hit mesh to the interactive group that owns it.
+  function ownerOf(mesh) {
+    let node = mesh;
+    while (node && !node.userData.section) node = node.parent;
+    return node ?? null;
+  }
 
   let pointerActive = false;
   let hovered = null;
@@ -17,8 +22,8 @@ export function createInteraction({ camera, domElement, objects, onSelect }) {
 
   function pick() {
     raycaster.setFromCamera(pointer, camera);
-    const [hit] = raycaster.intersectObjects(targets, false);
-    return hit?.object.userData.target ?? null;
+    const [hit] = raycaster.intersectObjects(objects, true);
+    return hit ? ownerOf(hit.object) : null;
   }
 
   function setHovered(object) {

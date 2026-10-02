@@ -13,7 +13,8 @@ export function createRenderer(container, { alpha = false } = {}) {
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // Neutral keeps the pastel palette true to its colours (ACES would desaturate it).
+  renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1;
 
   renderer.shadowMap.enabled = true;

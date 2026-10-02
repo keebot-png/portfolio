@@ -6,10 +6,12 @@ export const portfolio = {
     name: 'Alex Morgan',
     title: 'Full-Stack Software Developer',
     description:
-      'I build fast, accessible web applications and the APIs behind them. ' +
-      'I enjoy turning messy requirements into clean, maintainable systems, ' +
-      'and I care about performance, good developer experience and shipping ' +
-      'work that real people find easy to use.',
+      'I am a full-stack developer who enjoys building practical software: ' +
+      'business systems, web applications, ecommerce platforms and the APIs ' +
+      'that connect them. I like turning messy requirements into clean, ' +
+      'maintainable systems that are fast, accessible and easy to use.',
+    // Short list of the kinds of work you focus on, shown as tags.
+    focus: ['Web applications', 'Business systems', 'Ecommerce', 'APIs & integrations'],
   },
 
   experience: [
