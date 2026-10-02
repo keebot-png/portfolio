@@ -5,6 +5,7 @@ import { createCamera, resizeCamera } from './three/camera.js';
 import { createRenderer, resizeRenderer } from './three/renderer.js';
 import { addLighting } from './three/lighting.js';
 import { createEnvironment } from './three/environment.js';
+import { loadAvatar } from './three/avatar.js';
 import { startAnimationLoop } from './three/animation.js';
 
 const container = document.getElementById('app');
@@ -22,4 +23,11 @@ window.addEventListener('resize', () => {
   resizeRenderer(renderer, width, height);
 });
 
-startAnimationLoop(renderer, scene, camera);
+let avatar = null;
+loadAvatar(scene).then((loaded) => {
+  avatar = loaded;
+});
+
+startAnimationLoop(renderer, scene, camera, (delta, elapsed) => {
+  avatar?.update(delta, elapsed);
+});
