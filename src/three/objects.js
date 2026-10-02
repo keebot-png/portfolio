@@ -37,6 +37,7 @@ function createMonitor(width, height, lineSeed) {
       0.034,
     ]);
     line.userData.line = { x: line.position.x, width: lineWidth };
+    line.userData.detail = true;
     lines.push(line);
   }
 
@@ -70,9 +71,11 @@ function createPinboard() {
   ].map(([x, y, color, tilt]) => {
     const note = box(0.22, 0.22, 0.008, clay(color), [x, y, 0.045], [0, 0, tilt]);
     const pin = sphere(0.016, clay(0xe05a5a), [x, y + 0.09, 0.06], 12);
-    const text = [0, 1, 2].map((i) =>
-      box(0.12 - i * 0.03, 0.008, 0.002, clay(0x9a8f80), [x - 0.015 + i * 0.015, y + 0.03 - i * 0.04, 0.05], [0, 0, tilt])
-    );
+    const text = [0, 1, 2].map((i) => {
+      const line = box(0.12 - i * 0.03, 0.008, 0.002, clay(0x9a8f80), [x - 0.015 + i * 0.015, y + 0.03 - i * 0.04, 0.05], [0, 0, tilt]);
+      line.userData.detail = true;
+      return line;
+    });
     return group([note, pin, ...text]);
   });
 
@@ -107,12 +110,24 @@ function createShelf() {
   return group([plank, ...brackets, ...bookMeshes, pot, ...leaves], [DESK.x - 1.05, 1.9, WALL_Z]);
 }
 
+// Invisible volume so a fingertip can hit a small prop.
+function tapTarget(w, h, d, position = [0, h / 2, 0]) {
+  const target = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+  );
+  target.position.set(...position);
+  target.castShadow = false;
+  target.receiveShadow = false;
+  return target;
+}
+
 function createMug() {
   const material = clay(0xf28c28);
   const body = cylinder(0.065, 0.058, 0.13, material, [0, 0.065, 0]);
   const coffee = cylinder(0.055, 0.055, 0.01, clay(0x4a3326), [0, 0.128, 0]);
   const handle = mesh(new THREE.TorusGeometry(0.04, 0.012, 10, 20, Math.PI), material, [0.065, 0.065, 0], [0, 0, -Math.PI / 2]);
-  return group([body, coffee, handle], [DESK.x + 0.95, DESK.y + 0.04, DESK.z + 0.25], [0, -0.4, 0]);
+  return group([body, coffee, handle, tapTarget(0.32, 0.3, 0.32)], [DESK.x + 0.95, DESK.y + 0.04, DESK.z + 0.25], [0, -0.4, 0]);
 }
 
 function createPhone() {
@@ -122,7 +137,7 @@ function createPhone() {
     box(0.028, 0.028, 0.003, clay(color), [-0.03 + (i % 2) * 0.06, 0.19 - Math.floor(i / 2) * 0.05, 0.012])
   );
   const stand = box(0.08, 0.1, 0.02, clay(0x3a3d4a), [0, 0.05, -0.03], [-0.5, 0, 0]);
-  const phone = group([body, screen, ...icons, stand]);
+  const phone = group([body, screen, ...icons, stand, tapTarget(0.28, 0.36, 0.22)]);
   phone.rotation.x = -0.25;
   return group([phone], [DESK.x - 0.78, DESK.y + 0.04, DESK.z + 0.22], [0, 0.35, 0]);
 }
@@ -147,6 +162,7 @@ export function createInteractiveObject(section, object) {
     child.userData.target = object;
     const list = Array.isArray(child.material) ? child.material : [child.material];
     for (const material of list) {
+      if (!material.emissive) continue;
       materials.push({
         material,
         baseEmissive: material.emissive.clone(),
@@ -190,7 +206,15 @@ export function createPortfolioObjects(scene, props = PROPS) {
   return objects;
 }
 
-export function updatePortfolioObjects(objects, delta, elapsed = 0) {
+export function setDetailVisible(objects, visible) {
+  for (const object of objects) {
+    object.traverse((child) => {
+      if (child.userData.detail) child.visible = visible;
+    });
+  }
+}
+
+export function updatePortfolioObjects(objects, delta, elapsed = 0, { simple = false } = {}) {
   for (const object of objects) {
     const data = object.userData;
     const target = data.hovered ? 1 : data.selected ? 0.55 : 0;
@@ -200,18 +224,21 @@ export function updatePortfolioObjects(objects, delta, elapsed = 0) {
     // Desk items stay put until attention lands on them, then they lift and
     // float gently with a slight rotation, so the motion never competes with the content.
     const t = elapsed + data.phase;
+    const motion = simple ? 0 : 1;
     object.scale.setScalar(data.baseScale * (1 + h * 0.06));
-    object.position.y = data.basePosition.y + h * (0.03 + Math.sin(t * 2.2) * 0.012);
-    object.rotation.y = data.baseRotationY + h * Math.sin(t * 1.6) * 0.035;
+    object.position.y = data.basePosition.y + h * (0.03 + Math.sin(t * 2.2) * 0.012 * motion);
+    object.rotation.y = data.baseRotationY + h * Math.sin(t * 1.6) * 0.035 * motion;
 
     // Lighting: screens softly pulse all the time; hover adds a warm glow that
-    // is subtle enough for dark screens to stay dark.
+    // is subtle enough for dark screens to stay dark. Pulse is skipped on small screens.
     for (const { material, baseEmissive, baseIntensity, pulse } of data.materials) {
-      const idle = pulse ? baseIntensity + Math.sin(elapsed * pulse.speed + pulse.phase) * pulse.amplitude : baseIntensity;
+      const idle = !simple && pulse ? baseIntensity + Math.sin(elapsed * pulse.speed + pulse.phase) * pulse.amplitude : baseIntensity;
       material.emissive.copy(baseEmissive).lerp(HIGHLIGHT_COLOR, h * 0.2);
       material.emissiveIntensity = THREE.MathUtils.lerp(idle, Math.max(idle, 0.18), h);
     }
 
-    for (const screen of data.screens) updateScreen(screen, elapsed);
+    if (!simple) {
+      for (const screen of data.screens) updateScreen(screen, elapsed);
+    }
   }
 }

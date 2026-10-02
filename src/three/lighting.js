@@ -2,13 +2,13 @@ import * as THREE from 'three';
 
 // Soft, warm "clay render" lighting: a strong hemisphere light keeps shadows
 // gentle, one key light casts soft shadows, a cool fill adds a little depth.
-export function addLighting(scene) {
+export function addLighting(scene, { shadowMapSize = 2048 } = {}) {
   const ambient = new THREE.HemisphereLight(0xfff8ee, 0xd9c2a8, 1.6);
 
   const key = new THREE.DirectionalLight(0xfff1dc, 2.4);
   key.position.set(-3.5, 7, 5);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(shadowMapSize, shadowMapSize);
   key.shadow.camera.near = 1;
   key.shadow.camera.far = 25;
   key.shadow.camera.left = -6;
@@ -24,4 +24,13 @@ export function addLighting(scene) {
 
   scene.add(ambient, key, fill);
   return { ambient, key, fill };
+}
+
+export function setShadowMapSize({ key }, size) {
+  if (key.shadow.mapSize.x === size) return;
+  key.shadow.mapSize.set(size, size);
+  if (key.shadow.map) {
+    key.shadow.map.dispose();
+    key.shadow.map = null;
+  }
 }

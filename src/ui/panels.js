@@ -1,6 +1,7 @@
 import { el } from './dom.js';
+import { NARROW_UI_QUERY } from '../three/viewport.js';
 
-const NARROW_QUERY = window.matchMedia('(max-width: 720px)');
+const NARROW_QUERY = window.matchMedia(NARROW_UI_QUERY);
 const CLOSE_DELAY = 200;
 
 export function createPanels({ root, sections, renderers, onClose }) {
@@ -82,10 +83,11 @@ export function createPanels({ root, sections, renderers, onClose }) {
       return active;
     },
 
-    // Screen space covered by the open panel, used to keep the 3D scene visible.
+    // Screen space covered by the open panel (plus anything below/right of it,
+    // such as the mobile navigation bar), used to keep the 3D scene visible.
     getOcclusion() {
       if (!active) return { right: 0, bottom: 0 };
-      const rect = container.getBoundingClientRect();
+      const rect = panels.get(active).panel.getBoundingClientRect();
       return NARROW_QUERY.matches
         ? { right: 0, bottom: window.innerHeight - rect.top }
         : { right: window.innerWidth - rect.left, bottom: 0 };

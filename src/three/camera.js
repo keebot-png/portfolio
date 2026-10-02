@@ -1,16 +1,17 @@
 import * as THREE from 'three';
+import { SCENE_LAYOUTS } from './viewport.js';
 
-// The character stands left of centre with the desk behind him on the right,
-// so the overview looks slightly down at the middle of that arrangement.
-export const CAMERA_TARGET = new THREE.Vector3(0.45, 1.05, -0.5);
-
-const HOME_POSITION = new THREE.Vector3(0.6, 2.05, 5.1);
-
-// Midpoint between the avatar (x ≈ -0.75) and the desk (x ≈ 1.05).
-const FOCUS_CENTER_X = 0.15;
+// The overview looks slightly down at the scene from the front-right; the
+// exact target and distance depend on the active layout and screen aspect.
+const HOME_DIRECTION = new THREE.Vector3(0.15, 1.0, 5.6);
+const BASE_DISTANCE = HOME_DIRECTION.length();
+HOME_DIRECTION.normalize();
 
 // How far (world units) the camera drifts at the edges of the screen.
 const PARALLAX = { x: 0.22, y: 0.1, lookX: 0.08, lookY: 0.04 };
+
+// Vertical extent of the scene (floor to pinboard top, plus breathing room).
+const SCENE_HEIGHT = 2.9;
 
 export function createCamera({ fov = 40, near = 0.1, far = 100 } = {}) {
   const camera = new THREE.PerspectiveCamera(
@@ -19,8 +20,6 @@ export function createCamera({ fov = 40, near = 0.1, far = 100 } = {}) {
     near,
     far
   );
-  camera.position.copy(HOME_POSITION);
-  camera.lookAt(CAMERA_TARGET);
   return camera;
 }
 
@@ -34,8 +33,12 @@ export const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 
 // Drives the camera: timed eased moves between views (animateCameraTo), a
 // subtle mouse parallax, and a view offset that keeps the scene centred in
 // whatever part of the screen the UI leaves uncovered.
-export function createCameraRig(camera, { duration = 1.2 } = {}) {
-  const state = { position: camera.position.clone(), target: CAMERA_TARGET.clone() };
+export function createCameraRig(camera, { layout = SCENE_LAYOUTS.wide, duration = 1.2 } = {}) {
+  const home = { position: new THREE.Vector3(), target: new THREE.Vector3() };
+  const state = { position: new THREE.Vector3(), target: new THREE.Vector3() };
+  // What the camera is meant to be looking at, so layout/aspect changes can re-frame it.
+  const view = { mode: 'home', point: new THREE.Vector3() };
+  let activeLayout = layout;
 
   const tween = {
     active: false,
@@ -49,8 +52,37 @@ export function createCameraRig(camera, { duration = 1.2 } = {}) {
 
   const offset = { current: new THREE.Vector2(), desired: new THREE.Vector2() };
   const parallax = { current: new THREE.Vector2(), desired: new THREE.Vector2() };
-  const homeDirection = HOME_POSITION.clone().sub(CAMERA_TARGET);
   const lookTarget = new THREE.Vector3();
+  // Fraction of the screen height not covered by UI while a section is open.
+  let freeHeight = 1;
+
+  // Pull the camera back on narrow screens so the layout's minimum width still fits.
+  function computeHome() {
+    const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+    const visibleHalfWidth = Math.tan(halfFov) * camera.aspect;
+    const distance = Math.max(BASE_DISTANCE, activeLayout.minHalfWidth / visibleHalfWidth);
+    home.target.fromArray(activeLayout.cameraTarget);
+    home.position.copy(HOME_DIRECTION).multiplyScalar(distance).add(home.target);
+  }
+
+  function focusPose(point) {
+    // Pull back a little and tilt toward the prop while keeping the avatar
+    // and desk both in frame beside (or above) the open panel.
+    const target = new THREE.Vector3().lerpVectors(home.target, point, 0.12);
+    target.x = THREE.MathUtils.lerp(activeLayout.focusCenterX, point.x, 0.1);
+    target.y = THREE.MathUtils.lerp(home.target.y, point.y, 0.25);
+
+    const direction = home.position.clone().sub(home.target);
+    const homeDistance = direction.length();
+    // When the UI leaves only a short band free (bottom sheet), move back far
+    // enough for the whole scene height to fit in that band.
+    const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+    const fitDistance = SCENE_HEIGHT / freeHeight / (2 * Math.tan(halfFov));
+    const distance = Math.max(homeDistance * activeLayout.focusPullback, fitDistance);
+
+    const position = direction.setLength(distance).add(target);
+    return { position, target };
+  }
 
   function animateCameraTo({ position, target, duration: length = duration, easing = easeInOutCubic, onComplete = null }) {
     tween.from.position.copy(state.position);
@@ -76,25 +108,62 @@ export function createCameraRig(camera, { duration = 1.2 } = {}) {
     }
   }
 
+  // Re-apply the current view after the framing changed (resize / layout switch).
+  function reframe(options) {
+    const pose = view.mode === 'focus' ? focusPose(view.point) : home;
+    animateCameraTo({ position: pose.position, target: pose.target, ...options });
+  }
+
+  computeHome();
+  state.position.copy(home.position);
+  state.target.copy(home.target);
+  camera.position.copy(home.position);
+  camera.lookAt(home.target);
+
   return {
     animateCameraTo,
 
-    // Section view: pull back a little and tilt toward the prop while keeping
-    // the avatar and desk both in frame beside the open panel.
     focus(point, options = {}) {
-      const target = new THREE.Vector3().lerpVectors(CAMERA_TARGET, point, 0.12);
-      target.x = THREE.MathUtils.lerp(FOCUS_CENTER_X, point.x, 0.1);
-      target.y = THREE.MathUtils.lerp(CAMERA_TARGET.y, point.y, 0.25);
-      const position = homeDirection.clone().multiplyScalar(1.18).add(target);
-      animateCameraTo({ position, target, ...options });
+      view.mode = 'focus';
+      view.point.copy(point);
+      const pose = focusPose(point);
+      animateCameraTo({ position: pose.position, target: pose.target, ...options });
     },
 
     reset(options = {}) {
-      animateCameraTo({ position: HOME_POSITION, target: CAMERA_TARGET, ...options });
+      view.mode = 'home';
+      animateCameraTo({ position: home.position, target: home.target, ...options });
     },
 
-    setViewOffset(x, y) {
+    setLayout(layout) {
+      if (layout === activeLayout) return;
+      activeLayout = layout;
+      computeHome();
+      reframe({ duration: 0.8 });
+    },
+
+    // Call after the camera aspect changed; keeps the scene framed without a visible jump.
+    resize() {
+      computeHome();
+      reframe({ duration: 0.3 });
+    },
+
+    // `visibleHeight` is the fraction (0–1] of the screen height left free by the UI.
+    setViewOffset(x, y, visibleHeight = 1) {
       offset.desired.set(x, y);
+      const nextFree = THREE.MathUtils.clamp(visibleHeight, 0.15, 1);
+      if (nextFree === freeHeight) return;
+      freeHeight = nextFree;
+      // Re-aim an in-flight or settled focus move so the fit distance applies.
+      if (view.mode === 'focus') {
+        const pose = focusPose(view.point);
+        if (tween.active) {
+          tween.to.position.copy(pose.position);
+          tween.to.target.copy(pose.target);
+        } else {
+          animateCameraTo({ position: pose.position, target: pose.target, duration: 0.3 });
+        }
+      }
     },
 
     // Normalised pointer position in [-1, 1]; (0, 0) means no parallax.
@@ -104,6 +173,10 @@ export function createCameraRig(camera, { duration = 1.2 } = {}) {
 
     get isAnimating() {
       return tween.active;
+    },
+
+    get layout() {
+      return activeLayout;
     },
 
     update(delta) {

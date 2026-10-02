@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+const TAP_SLOP = 12; // px
+const TAP_TIME = 600; // ms
+
 export function createInteraction({ camera, domElement, objects, onSelect }) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -58,14 +61,37 @@ export function createInteraction({ camera, domElement, objects, onSelect }) {
     setHovered(null);
   }
 
-  function onClick(event) {
+  // Select on tap/click, but not when the pointer dragged (e.g. a touch that
+  // was really a swipe) or was held for a long time.
+  const press = { x: 0, y: 0, time: 0, id: null };
+
+  function onPointerDown(event) {
+    if (!event.isPrimary) return;
+    press.id = event.pointerId;
+    press.x = event.clientX;
+    press.y = event.clientY;
+    press.time = performance.now();
+  }
+
+  function onPointerUp(event) {
+    if (event.pointerId !== press.id) return;
+    press.id = null;
+    const moved = Math.hypot(event.clientX - press.x, event.clientY - press.y);
+    const held = performance.now() - press.time;
+    if (moved > TAP_SLOP || held > TAP_TIME) return;
     setPointer(event);
     select(pick());
   }
 
+  function onPointerCancel() {
+    press.id = null;
+  }
+
   domElement.addEventListener('pointermove', onPointerMove);
   domElement.addEventListener('pointerleave', onPointerLeave);
-  domElement.addEventListener('click', onClick);
+  domElement.addEventListener('pointerdown', onPointerDown);
+  domElement.addEventListener('pointerup', onPointerUp);
+  domElement.addEventListener('pointercancel', onPointerCancel);
 
   return {
     // Raycast every frame so hover stays correct while objects move.
@@ -85,7 +111,9 @@ export function createInteraction({ camera, domElement, objects, onSelect }) {
     dispose() {
       domElement.removeEventListener('pointermove', onPointerMove);
       domElement.removeEventListener('pointerleave', onPointerLeave);
-      domElement.removeEventListener('click', onClick);
+      domElement.removeEventListener('pointerdown', onPointerDown);
+      domElement.removeEventListener('pointerup', onPointerUp);
+      domElement.removeEventListener('pointercancel', onPointerCancel);
       setHovered(null);
     },
   };

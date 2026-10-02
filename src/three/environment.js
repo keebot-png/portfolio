@@ -101,6 +101,13 @@ function createPlant(position, scale = 1) {
   return plant;
 }
 
+// Decor that can be dropped on small screens: it sits outside the compact
+// framing anyway and skipping it saves draw calls and shadow work.
+function decor(object) {
+  object.userData.decor = true;
+  return object;
+}
+
 export function createEnvironment(scene) {
   const environment = new THREE.Group();
   environment.name = 'environment';
@@ -109,9 +116,15 @@ export function createEnvironment(scene) {
     createRug(),
     createDesk(),
     createChair(),
-    createPlant([2.75, 0, -0.5], 1.15),
-    createPlant([-1.9, 0, -1.6], 0.75)
+    decor(createPlant([2.75, 0, -0.5], 1.15)),
+    decor(createPlant([-1.9, 0, -1.6], 0.75))
   );
   scene.add(environment);
   return environment;
+}
+
+export function setDecorVisible(environment, visible) {
+  for (const child of environment.children) {
+    if (child.userData.decor) child.visible = visible;
+  }
 }

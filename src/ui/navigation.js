@@ -40,9 +40,16 @@ export function createNavigation({ root, about, sections, onSelect, onHome }) {
       for (const [id, button] of buttons) {
         button.setAttribute('aria-expanded', String(id === activeId));
       }
+      // On phones the list scrolls horizontally; keep the active item in view.
+      buttons.get(activeId)?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
     },
     focus(id) {
       buttons.get(id)?.focus();
+    },
+    // Height of the header band at the top of the screen (brand on phones,
+    // brand + nav on larger screens), used to keep the 3D scene clear of it.
+    getHeaderBottom() {
+      return header.getBoundingClientRect().bottom;
     },
   };
 }

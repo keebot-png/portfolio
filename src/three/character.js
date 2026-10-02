@@ -169,7 +169,7 @@ export function createCharacter({ groundY = 0 } = {}) {
 
   const look = { yaw: 0, pitch: 0 };
 
-  function update(delta, elapsed, { pointer = null } = {}) {
+  function update(delta, elapsed, { pointer = null, simple = false } = {}) {
     const breath = Math.sin(elapsed * 1.4);
     const sway = Math.sin(elapsed * 0.4);
 
@@ -179,7 +179,8 @@ export function createCharacter({ groundY = 0 } = {}) {
     man.rotation.z = Math.sin(elapsed * 0.3) * 0.008;
 
     // Head: follows the pointer gently, drifts a little, and occasionally glances away.
-    const glanceAmount = glanceOffset(elapsed);
+    // On small / reduced-motion screens the glance is skipped so the face stays still.
+    const glanceAmount = simple ? 0 : glanceOffset(elapsed);
     const targetYaw = (pointer?.x ?? 0) * LOOK.yaw + Math.sin(elapsed * 0.35) * 0.05 + glance.yaw * glanceAmount;
     const targetPitch = -(pointer?.y ?? 0) * LOOK.pitch + Math.sin(elapsed * 0.5) * 0.025 + glance.pitch * glanceAmount;
     const smoothing = 1 - Math.exp(-4 * delta);

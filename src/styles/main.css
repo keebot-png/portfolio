@@ -40,6 +40,8 @@ body {
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 [hidden] {
@@ -52,16 +54,40 @@ button {
   background: none;
   border: none;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 a {
   color: var(--color-accent);
   text-decoration: none;
   text-underline-offset: 3px;
+  touch-action: manipulation;
 }
 
-a:hover {
-  text-decoration: underline;
+/* Hover affordances only where a hover-capable pointer exists. */
+@media (hover: hover) {
+  a:hover {
+    text-decoration: underline;
+  }
+
+  .nav-link:hover {
+    color: var(--color-text);
+    background: var(--color-accent-soft);
+  }
+
+  .panel-close:hover {
+    color: var(--color-text);
+    border-color: var(--color-border-strong);
+  }
+
+  .panel-back:hover,
+  .text-button:hover {
+    color: var(--color-text);
+  }
+
+  .card:hover {
+    border-color: var(--color-border-strong);
+  }
 }
 
 :focus-visible {
@@ -75,6 +101,9 @@ a:hover {
 #app {
   position: fixed;
   inset: 0;
+  /* Taps go to the 3D scene; no scrolling or pinch zoom on the canvas. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #app canvas {
@@ -89,6 +118,7 @@ a:hover {
 #ui {
   position: fixed;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
 }
 
@@ -170,11 +200,6 @@ a:hover {
     border-color var(--transition);
 }
 
-.nav-link:hover {
-  color: var(--color-text);
-  background: var(--color-accent-soft);
-}
-
 .nav-link[aria-expanded='true'] {
   color: #fff;
   background: var(--color-accent);
@@ -249,11 +274,6 @@ a:hover {
   transition: color var(--transition), border-color var(--transition);
 }
 
-.panel-close:hover {
-  color: var(--color-text);
-  border-color: var(--color-border-strong);
-}
-
 .panel-body {
   flex: 1;
   overflow-y: auto;
@@ -271,11 +291,6 @@ a:hover {
   font-size: 0.85rem;
   color: var(--color-muted);
   transition: color var(--transition);
-}
-
-.panel-back:hover,
-.text-button:hover {
-  color: var(--color-text);
 }
 
 .text-button {
@@ -419,10 +434,6 @@ a:hover {
   transition: border-color var(--transition);
 }
 
-.card:hover {
-  border-color: var(--color-border-strong);
-}
-
 /* Contact */
 
 .contact-list {
@@ -477,41 +488,224 @@ a:hover {
   padding: var(--space);
 }
 
-/* Narrow screens: navigation scrolls horizontally, panels become a bottom sheet. */
+/* Tablets and small laptops in landscape: tighter header and a narrower panel. */
 
-@media (max-width: 720px) {
+@media (max-width: 1024px) {
+  .nav-link {
+    padding: 9px 12px;
+    font-size: 0.68rem;
+  }
+
+  .panels {
+    width: min(400px, calc(100vw - 2 * var(--space)));
+  }
+}
+
+/* Phones (any orientation), tablet portrait, and short landscape windows:
+   brand at the top, a thumb-friendly navigation bar at the bottom, and
+   section panels as a bottom sheet above it. Keep in sync with
+   NARROW_UI_QUERY in src/three/viewport.js. Nothing relies on hover. */
+
+@media (max-width: 900px), (max-height: 560px) {
   :root {
     --space: 16px;
+    --nav-height: calc(68px + env(safe-area-inset-bottom, 0px));
   }
 
   .site-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+    top: calc(var(--space) + env(safe-area-inset-top, 0px));
+    left: calc(var(--space) + env(safe-area-inset-left, 0px));
+    right: calc(var(--space) + env(safe-area-inset-right, 0px));
+    gap: 0;
+  }
+
+  .brand-name {
+    font-size: 1.35rem;
   }
 
   .brand-title {
-    display: none;
+    margin-top: 6px;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+  }
+
+  .site-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    height: var(--nav-height);
+    padding: 10px var(--space) calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--color-surface-strong);
+    border-top: 1px solid var(--color-border);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
   }
 
   .nav-list {
+    height: 48px;
+    gap: 6px;
+    padding: 0;
     overflow-x: auto;
+    scroll-snap-type: x proximity;
     scrollbar-width: none;
+    background: none;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Fade the right edge as a hint that the row scrolls; the spacer lets the
+     last item scroll clear of the fade. */
+  .site-nav {
+    mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  }
+
+  .nav-list::after {
+    content: '';
+    flex: 0 0 28px;
+  }
+
+  .nav-list li {
+    flex: 1 0 auto;
+    scroll-snap-align: start;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 0.7rem;
+    background: var(--color-accent-soft);
+    border-color: transparent;
   }
 
   .panels {
     top: auto;
-    left: var(--space);
-    right: var(--space);
+    left: 0;
+    right: 0;
+    bottom: var(--nav-height);
     width: auto;
-    height: 58vh;
+    height: min(58vh, calc(100vh - var(--nav-height) - 120px));
+    height: min(58dvh, calc(100dvh - var(--nav-height) - 120px));
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
   }
 
   .panel {
-    transform: translateY(12px);
+    position: relative;
+    border-radius: 20px 20px 0 0;
+    border-bottom: none;
+    background: var(--color-surface-strong);
+    transform: translateY(24px);
+  }
+
+  /* Grab-handle look, so the sheet reads as a sheet. */
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 40px;
+    height: 4px;
+    background: var(--color-border-strong);
+    border-radius: 2px;
+    transform: translateX(-50%);
+  }
+
+  .panel-header {
+    padding: 22px var(--space) 12px;
+  }
+
+  .panel-close {
+    width: 40px;
+    height: 40px;
+  }
+
+  .panel-body {
+    padding: 18px var(--space) 20px;
+    font-size: 0.95rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .panel-footer {
+    display: none;
+  }
+
+  .lead {
+    font-size: 1rem;
+  }
+
+  .item p:not(.item-meta),
+  .item-text {
+    font-size: 0.95rem;
+  }
+
+  .tag {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  .link-row {
+    gap: 12px 24px;
+  }
+
+  .link-row a {
+    display: inline-block;
+    padding: 6px 0;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .modal {
+    width: calc(100vw - 2 * var(--space));
+    max-height: calc(100dvh - 2 * var(--space));
+  }
+
+  /* Landscape phones: keep a usable band of the scene above a shorter sheet. */
+  @media (max-height: 560px) {
+    .brand-name {
+      font-size: 1.15rem;
+    }
+
+    .brand-title {
+      margin-top: 4px;
+    }
+
+    .panels {
+      height: min(44vh, calc(100vh - var(--nav-height) - 72px));
+      height: min(44dvh, calc(100dvh - var(--nav-height) - 72px));
+    }
+  }
+}
+
+/* Touch screens: pressed state instead of hover, and a darker close button. */
+
+@media (hover: none) {
+  .nav-link:active,
+  .panel-close:active {
+    color: #fff;
+    background: var(--color-accent);
+    border-color: var(--color-accent-dark);
+  }
+
+  .panel-close {
+    color: var(--color-text-soft);
   }
 }
 
