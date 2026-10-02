@@ -13,9 +13,15 @@ const HIGHLIGHT_COLOR = new THREE.Color(0xffb067);
 const CODE_COLORS = [0xc792ea, 0x7ec699, 0xf5c26b, 0x82aaff, 0xf07178];
 const WALL_Z = DESK.z - DESK.depth / 2 - 0.08;
 
+function pulse(material, amplitude, speed, phase = 0) {
+  material.userData.pulse = { amplitude, speed, phase };
+  return material;
+}
+
 function createMonitor(width, height, lineSeed) {
   const frame = box(width, height, 0.05, clay(0x2b2e3a), [0, height / 2 + 0.2, 0]);
-  const screen = box(width - 0.06, height - 0.06, 0.012, clay(0x1b1d28), [0, height / 2 + 0.2, 0.025]);
+  const screenMaterial = pulse(clay(0x1b1d28, { emissive: 0x2a3350, emissiveIntensity: 0.25 }), 0.08, 0.9, lineSeed);
+  const screen = box(width - 0.06, height - 0.06, 0.012, screenMaterial, [0, height / 2 + 0.2, 0.025]);
 
   const lines = [];
   const rows = Math.floor((height - 0.12) / 0.045);
@@ -25,18 +31,21 @@ function createMonitor(width, height, lineSeed) {
     const indent = (i % 4) * 0.04;
     const lineWidth = 0.1 + frac * 0.28;
     const color = CODE_COLORS[Math.floor(frac * CODE_COLORS.length)];
-    lines.push(
-      box(lineWidth, 0.014, 0.004, clay(color, { emissive: color, emissiveIntensity: 0.35 }), [
-        -width / 2 + 0.08 + indent + lineWidth / 2,
-        height + 0.2 - 0.08 - i * 0.045,
-        0.034,
-      ])
-    );
+    const line = box(lineWidth, 0.014, 0.004, clay(color, { emissive: color, emissiveIntensity: 0.35 }), [
+      -width / 2 + 0.08 + indent + lineWidth / 2,
+      height + 0.2 - 0.08 - i * 0.045,
+      0.034,
+    ]);
+    line.userData.line = { x: line.position.x, width: lineWidth };
+    lines.push(line);
   }
 
   const stand = box(0.06, 0.2, 0.05, clay(0x3a3d4a), [0, 0.1, -0.02]);
   const base = box(0.34, 0.025, 0.2, clay(0x3a3d4a), [0, 0.0125, 0]);
-  return group([frame, screen, ...lines, stand, base]);
+  const monitor = group([frame, screen, ...lines, stand, base]);
+  // Code "types" itself onto the screen, line by line, then starts over.
+  monitor.userData.screen = { lines, speed: 1.4, phase: lineSeed * 1.7 };
+  return monitor;
 }
 
 function createMonitors() {
@@ -108,7 +117,7 @@ function createMug() {
 
 function createPhone() {
   const body = box(0.12, 0.24, 0.016, clay(0x2b2e3a), [0, 0.12, 0]);
-  const screen = box(0.105, 0.22, 0.004, clay(0x9cc9ec, { emissive: 0x9cc9ec, emissiveIntensity: 0.25 }), [0, 0.12, 0.009]);
+  const screen = box(0.105, 0.22, 0.004, pulse(clay(0x9cc9ec, { emissive: 0x9cc9ec, emissiveIntensity: 0.25 }), 0.1, 1.3), [0, 0.12, 0.009]);
   const icons = [0xf28c28, 0x7bbf9e, 0xe06b6b, 0xf7e07a].map((color, i) =>
     box(0.028, 0.028, 0.003, clay(color), [-0.03 + (i % 2) * 0.06, 0.19 - Math.floor(i / 2) * 0.05, 0.012])
   );
@@ -131,12 +140,19 @@ export function createInteractiveObject(section, object) {
   object.name = `section-${section}`;
 
   const materials = [];
+  const screens = [];
   object.traverse((child) => {
+    if (child.userData.screen) screens.push(child.userData.screen);
     if (!child.isMesh) return;
     child.userData.target = object;
     const list = Array.isArray(child.material) ? child.material : [child.material];
     for (const material of list) {
-      materials.push({ material, baseEmissive: material.emissive.clone(), baseIntensity: material.emissiveIntensity });
+      materials.push({
+        material,
+        baseEmissive: material.emissive.clone(),
+        baseIntensity: material.emissiveIntensity,
+        pulse: material.userData.pulse ?? null,
+      });
     }
   });
 
@@ -146,10 +162,24 @@ export function createInteractiveObject(section, object) {
     selected: false,
     highlight: 0,
     basePosition: object.position.clone(),
+    baseRotationY: object.rotation.y,
     baseScale: object.scale.x,
+    phase: Math.random() * Math.PI * 2,
     materials,
+    screens,
   };
   return object;
+}
+
+function updateScreen({ lines, speed, phase }, elapsed) {
+  const cycle = lines.length + 4;
+  const progress = (elapsed * speed + phase) % cycle;
+  lines.forEach((line, i) => {
+    const amount = THREE.MathUtils.clamp(progress - i, 0, 1);
+    line.visible = amount > 0;
+    line.scale.x = Math.max(amount, 0.001);
+    line.position.x = line.userData.line.x - (line.userData.line.width * (1 - amount)) / 2;
+  });
 }
 
 export function createPortfolioObjects(scene, props = PROPS) {
@@ -160,19 +190,28 @@ export function createPortfolioObjects(scene, props = PROPS) {
   return objects;
 }
 
-export function updatePortfolioObjects(objects, delta) {
+export function updatePortfolioObjects(objects, delta, elapsed = 0) {
   for (const object of objects) {
     const data = object.userData;
     const target = data.hovered ? 1 : data.selected ? 0.55 : 0;
     data.highlight = THREE.MathUtils.damp(data.highlight, target, 10, delta);
+    const h = data.highlight;
 
-    object.scale.setScalar(data.baseScale * (1 + data.highlight * 0.06));
-    object.position.y = data.basePosition.y + data.highlight * 0.025;
+    // Desk items stay put until attention lands on them, then they lift and
+    // float gently with a slight rotation, so the motion never competes with the content.
+    const t = elapsed + data.phase;
+    object.scale.setScalar(data.baseScale * (1 + h * 0.06));
+    object.position.y = data.basePosition.y + h * (0.03 + Math.sin(t * 2.2) * 0.012);
+    object.rotation.y = data.baseRotationY + h * Math.sin(t * 1.6) * 0.035;
 
-    // A gentle warm glow; subtle enough that dark screens stay dark.
-    for (const { material, baseEmissive, baseIntensity } of data.materials) {
-      material.emissive.copy(baseEmissive).lerp(HIGHLIGHT_COLOR, data.highlight * 0.2);
-      material.emissiveIntensity = THREE.MathUtils.lerp(baseIntensity, Math.max(baseIntensity, 0.18), data.highlight);
+    // Lighting: screens softly pulse all the time; hover adds a warm glow that
+    // is subtle enough for dark screens to stay dark.
+    for (const { material, baseEmissive, baseIntensity, pulse } of data.materials) {
+      const idle = pulse ? baseIntensity + Math.sin(elapsed * pulse.speed + pulse.phase) * pulse.amplitude : baseIntensity;
+      material.emissive.copy(baseEmissive).lerp(HIGHLIGHT_COLOR, h * 0.2);
+      material.emissiveIntensity = THREE.MathUtils.lerp(idle, Math.max(idle, 0.18), h);
     }
+
+    for (const screen of data.screens) updateScreen(screen, elapsed);
   }
 }

@@ -22,6 +22,8 @@ const COLORS = {
 const REST_ARM_Z = 0.12;
 const RAISED_ARM_Z = 2.4;
 const WAVE = { raise: 0.5, hold: 2.0, lower: 0.6, firstAt: 3, minGap: 7, maxGap: 13 };
+const GLANCE = { duration: 1.6, minGap: 5, maxGap: 10, yaw: 0.35, pitch: 0.1 };
+const LOOK = { yaw: 0.32, pitch: 0.14, bodyFollow: 0.2 };
 
 function smoothstep(t) {
   const x = THREE.MathUtils.clamp(t, 0, 1);
@@ -147,7 +149,27 @@ export function createCharacter({ groundY = 0 } = {}) {
     return 0;
   }
 
-  function update(delta, elapsed) {
+  // Every few seconds he glances somewhere else for a moment, then looks back.
+  const glance = { startedAt: null, nextAt: THREE.MathUtils.randFloat(GLANCE.minGap, GLANCE.maxGap), yaw: 0, pitch: 0 };
+
+  function glanceOffset(elapsed) {
+    if (glance.startedAt === null) {
+      if (elapsed < glance.nextAt) return 0;
+      glance.startedAt = elapsed;
+      glance.yaw = THREE.MathUtils.randFloatSpread(GLANCE.yaw * 2);
+      glance.pitch = THREE.MathUtils.randFloatSpread(GLANCE.pitch * 2);
+    }
+    const t = (elapsed - glance.startedAt) / GLANCE.duration;
+    if (t < 1) return Math.sin(t * Math.PI);
+
+    glance.startedAt = null;
+    glance.nextAt = elapsed + THREE.MathUtils.randFloat(GLANCE.minGap, GLANCE.maxGap);
+    return 0;
+  }
+
+  const look = { yaw: 0, pitch: 0 };
+
+  function update(delta, elapsed, { pointer = null } = {}) {
     const breath = Math.sin(elapsed * 1.4);
     const sway = Math.sin(elapsed * 0.4);
 
@@ -156,14 +178,24 @@ export function createCharacter({ groundY = 0 } = {}) {
     man.rotation.y = sway * 0.03;
     man.rotation.z = Math.sin(elapsed * 0.3) * 0.008;
 
+    // Head: follows the pointer gently, drifts a little, and occasionally glances away.
+    const glanceAmount = glanceOffset(elapsed);
+    const targetYaw = (pointer?.x ?? 0) * LOOK.yaw + Math.sin(elapsed * 0.35) * 0.05 + glance.yaw * glanceAmount;
+    const targetPitch = -(pointer?.y ?? 0) * LOOK.pitch + Math.sin(elapsed * 0.5) * 0.025 + glance.pitch * glanceAmount;
+    const smoothing = 1 - Math.exp(-4 * delta);
+    look.yaw += (targetYaw - look.yaw) * smoothing;
+    look.pitch += (targetPitch - look.pitch) * smoothing;
+
     // Wave with the right arm; the left arm just drifts a little.
     const wave = waveAmount(elapsed);
     const waveTime = waveStartedAt === null ? 0 : elapsed - waveStartedAt;
     right.shoulder.rotation.z = -THREE.MathUtils.lerp(REST_ARM_Z, RAISED_ARM_Z, wave);
     right.shoulder.rotation.x = -0.25 * wave;
     right.elbow.rotation.z = -wave * (0.9 + Math.sin(waveTime * 13) * 0.5);
-    head.rotation.z = -0.08 * wave;
     left.shoulder.rotation.x = Math.sin(elapsed * 0.9) * 0.03;
+
+    head.rotation.set(look.pitch, look.yaw, -0.08 * wave);
+    chest.rotation.y = look.yaw * LOOK.bodyFollow;
 
     // Blink.
     const blinkT = elapsed % 4.1;

@@ -9,9 +9,9 @@ import { createRenderer, resizeRenderer } from './three/renderer.js';
 import { addLighting } from './three/lighting.js';
 import { createEnvironment } from './three/environment.js';
 import { loadAvatar } from './three/avatar.js';
-import { createPortfolioObjects, updatePortfolioObjects } from './three/objects.js';
+import { createPortfolioObjects } from './three/objects.js';
 import { createInteraction } from './three/interaction.js';
-import { startAnimationLoop } from './three/animation.js';
+import { createAnimationSystem } from './three/animation.js';
 
 import { createNavigation } from './ui/navigation.js';
 import { createPanels } from './ui/panels.js';
@@ -96,9 +96,12 @@ window.addEventListener('resize', () => {
   updateViewOffset();
 });
 
-startAnimationLoop(renderer, scene, camera, (delta, elapsed) => {
-  avatar?.update(delta, elapsed);
-  cameraRig.update(delta);
-  interaction.update();
-  updatePortfolioObjects(portfolioObjects, delta, elapsed);
+createAnimationSystem({
+  renderer,
+  scene,
+  camera,
+  cameraRig,
+  interaction,
+  objects: portfolioObjects,
+  getAvatar: () => avatar,
 });
