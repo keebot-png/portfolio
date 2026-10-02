@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { createCharacter } from './character.js';
 
-// Place a GLB at public/models/avatar.glb, then set this to '/models/avatar.glb'.
+// Place a GLB at public/models/avatar.glb, then set this to
+// `${import.meta.env.BASE_URL}models/avatar.glb` so it works on GitHub Pages.
 // Leave it null to keep the built-in character. A missing file falls back too.
 export const AVATAR_URL = null;
 
